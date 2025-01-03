@@ -21,6 +21,7 @@ type DBConfig struct {
 	Password string
 	DBName   string
 	Port     string
+	SSLMode  string
 }
 
 type DatabaseManager struct {
@@ -38,8 +39,8 @@ func (dm *DatabaseManager) Connect(dbType string, config DBConfig, models ...int
 	dm.mu.Lock()
 	defer dm.mu.Unlock()
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
-		config.Host, config.User, config.Password, config.DBName, config.Port)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+		config.Host, config.User, config.Password, config.DBName, config.Port, config.SSLMode)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
