@@ -105,6 +105,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 
 	var resp *WhatsappResponse
 
+	// TODO: Move this to a helper function
 	if len(attachments) == 0 {
 		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger)
 		if err != nil {
