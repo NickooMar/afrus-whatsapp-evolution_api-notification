@@ -133,9 +133,9 @@ func (rwe *ReceiptWhatsappEventUseCase) processRules(whatsappInstance *models.Wh
 	if err := rwe.maxSentRate(whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	if err := rwe.sleepTime(); err != nil {
-		return err
-	}
+	// if err := rwe.sleepTime(); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 

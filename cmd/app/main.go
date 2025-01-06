@@ -3,6 +3,7 @@ package main
 import (
 	config "afrus-whatsapp-evolution_api-notification/configs"
 	"afrus-whatsapp-evolution_api-notification/internal/domain/models"
+	"afrus-whatsapp-evolution_api-notification/internal/domain/models/events"
 	"afrus-whatsapp-evolution_api-notification/internal/usecase"
 	"afrus-whatsapp-evolution_api-notification/pkg/db"
 	"afrus-whatsapp-evolution_api-notification/pkg/queue"
@@ -48,7 +49,7 @@ func main() {
 		SSLMode:  conf.EventsDBSSLMode,
 	}
 
-	if err := dbManager.Connect(db.EventsDB, eventsConfig); err != nil {
+	if err := dbManager.Connect(db.EventsDB, eventsConfig, &events.Sent{}, &events.Accepted{}, &events.Canceled{}, &events.Delivered{}, &events.Failed{}, &events.PartiallyDelivered{}, &events.Queued{}, &events.Read{}, &events.Scheduled{}); err != nil {
 		panic(fmt.Sprintf("Failed to connect to Events database: %v", err))
 	}
 
