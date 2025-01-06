@@ -12,14 +12,23 @@ type WhatsappInstanceRepository struct {
 }
 
 type WhatsappInstanceRepositoryInterface interface {
-	GetWhatsappInstanceById(ctx context.Context, id int) (*models.WhatsappInstance, error)
 	Update(ctx context.Context, instance *models.WhatsappInstance) error
+	GetWhatsappInstanceById(ctx context.Context, id int) (*models.WhatsappInstance, error)
+	GetWhatsappInstancesByOrganization(ctx context.Context, whatsappInstance *models.WhatsappInstance) ([]models.WhatsappInstance, error)
 }
 
 func NewWhatsappInstanceRepository(db *gorm.DB) *WhatsappInstanceRepository {
 	return &WhatsappInstanceRepository{
 		db: db,
 	}
+}
+
+func (repo *WhatsappInstanceRepository) Update(ctx context.Context, instance *models.WhatsappInstance) error {
+	result := repo.db.WithContext(ctx).Model(&instance).Updates(instance)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
 }
 
 func (repo *WhatsappInstanceRepository) GetWhatsappInstanceById(ctx context.Context, id int) (*models.WhatsappInstance, error) {
@@ -31,10 +40,11 @@ func (repo *WhatsappInstanceRepository) GetWhatsappInstanceById(ctx context.Cont
 	return &instance, nil
 }
 
-func (repo *WhatsappInstanceRepository) Update(ctx context.Context, instance *models.WhatsappInstance) error {
-	result := repo.db.WithContext(ctx).Model(&instance).Updates(instance)
+func (repo *WhatsappInstanceRepository) GetWhatsappInstancesByOrganization(ctx context.Context, whatsappInstance *models.WhatsappInstance) ([]models.WhatsappInstance, error) {
+	var instances []models.WhatsappInstance
+	result := repo.db.WithContext(ctx).Where("organization_id = ? AND id != ?", whatsappInstance.OrganizationID, whatsappInstance.ID).Find(&instances)
 	if result.Error != nil {
-		return result.Error
+		return nil, result.Error
 	}
-	return nil
+	return instances, nil
 }

@@ -78,6 +78,11 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return err
 	}
 
+	whatsappInstances, err := whatsappInstanceRepo.GetWhatsappInstancesByOrganization(rwe.Ctx, whatsappInstance)
+	if err != nil {
+		return err
+	}
+
 	whatsappTriggerRepo := repositories.NewWhatsappTriggerRepository(rwe.AfrusDB)
 	whatsappTrigger, err := whatsappTriggerRepo.GetWhatsappTriggerById(rwe.Ctx, data.WhatsappTriggerID)
 	if err != nil {
@@ -94,31 +99,52 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return err
 	}
 
+	if err := whatsappInstanceRepo.Update(rwe.Ctx, whatsappInstance); err != nil {
+		return fmt.Errorf("error updating whatsapp instance data: %v", err)
+	}
+
 	var resp *WhatsappResponse
 
 	if len(attachments) == 0 {
 		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger)
 		if err != nil {
-			rwe.StoreEvent("failed", data, lead, resp)
-			return err
+			fmt.Printf("Failed to send message in main instance %s - %v\n", whatsappInstance.InstanceName, err)
+			for _, instance := range whatsappInstances {
+				resp, err = rwe.SendWhatsappTextMessage(lead, &instance, whatsappTrigger)
+				if err != nil {
+					fmt.Printf("[Failed to send message in %s] - %v\n", instance.InstanceName, err)
+				} else {
+					if err := rwe.StoreEvent("sent", data, lead, resp); err != nil {
+						return err
+					}
+					break
+				}
+			}
+			if err != nil {
+				if storeErr := rwe.StoreEvent("failed", data, lead, resp); storeErr != nil {
+					return storeErr
+				}
+				return err
+			}
+		} else {
+			if err := rwe.StoreEvent("sent", data, lead, resp); err != nil {
+				return err
+			}
 		}
-
 	} else {
 		for _, attachment := range attachments {
 			resp, err = rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment)
 			if err != nil {
-				rwe.StoreEvent("failed", data, lead, resp)
+				fmt.Printf("[Failed to send media message to main instance %s] - %v\n", whatsappInstance.InstanceName, err)
+				if storeErr := rwe.StoreEvent("failed", data, lead, resp); storeErr != nil {
+					return storeErr
+				}
 				return err
 			}
 		}
-	}
-
-	if err := rwe.StoreEvent("sent", data, lead, resp); err != nil {
-		return err
-	}
-
-	if err := whatsappInstanceRepo.Update(rwe.Ctx, whatsappInstance); err != nil {
-		return fmt.Errorf("error updating whatsapp instance data: %v", err)
+		if err := rwe.StoreEvent("sent", data, lead, resp); err != nil {
+			return err
+		}
 	}
 
 	log.Printf("[MESSAGE] - Message processed successfully - [Name: %s / Owner: %s / To: %s / Lead: %s] \n", whatsappTrigger.Name, whatsappInstance.Owner, lead.Phone, lead.Email)
@@ -133,9 +159,9 @@ func (rwe *ReceiptWhatsappEventUseCase) processRules(data dto.EventProcess, what
 	if err := rwe.maxSentRate(data, whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	if err := rwe.sleepTime(); err != nil {
-		return err
-	}
+	// if err := rwe.sleepTime(); err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
@@ -244,6 +270,11 @@ func (rwe *ReceiptWhatsappEventUseCase) sleepTime() error {
 func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventProcess, lead *models.Lead, resp *WhatsappResponse) error {
 	eventRepo := repositories.NewWhatsappEventRepository(rwe.EventsDB)
 
+	var messageID = ""
+	if resp != nil {
+		messageID = resp.Key.ID
+	}
+
 	var eventMap models.JSONB
 	respBytes, err := json.Marshal(resp)
 	if err != nil {
@@ -259,7 +290,7 @@ func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventPr
 		PhoneNumber:    lead.Phone,
 		ExternalID:     strconv.Itoa(data.WhatsappInstanceID),
 		ExternalTable:  "whatsapp_triggers",
-		MessageID:      resp.Key.ID,
+		MessageID:      messageID,
 		EventType:      1,
 		DateEvent:      time.Now().Format(time.RFC3339),
 		Event:          eventMap,
