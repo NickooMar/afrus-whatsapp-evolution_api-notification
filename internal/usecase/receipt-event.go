@@ -70,26 +70,25 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 }
 
 func (rwe *ReceiptWhatsappEventUseCase) processRules(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
-	if err := rwe.maxConsecutivesSent(whatsappInstance); err != nil {
+	if err := rwe.maxConsecutivesSent(whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	if err := rwe.maxSentRate(whatsappInstance); err != nil {
+	if err := rwe.maxSentRate(whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	// if err := rwe.sleepTime(); err != nil {
-	// 	return err
-	// }
+	if err := rwe.sleepTime(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *models.WhatsappInstance) error {
+func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	const (
 		baseMaxSends  = 2
 		maxSendsLimit = 6
 	)
 
-	// Calculate months since creation
 	monthsSinceCreation := int(time.Since(whatsappInstance.CreatedAt).Hours() / (24 * 30))
 
 	// Calculate max allowed sends (base + 1 per month, capped at maxSendsLimit)
@@ -98,30 +97,30 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *mo
 		maxAllowedSends = maxSendsLimit
 	}
 
-	// Get current consecutive sends from instance data
 	currentSends, ok := whatsappInstance.Data["consecutive_sends"].(float64)
 	if !ok {
-		// Initialize if not exists
 		whatsappInstance.Data["consecutive_sends"] = baseMaxSends
 		return nil
 	}
 
 	if int(currentSends) >= maxAllowedSends {
+		rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
+					"whatsapp_trigger_id": %d,
+					"whatsapp_instance_id": %d
+				}`, whatsappTrigger.ID, whatsappInstance.ID)), int(time.Minute)*5)
+
 		return fmt.Errorf("max consecutive sends limit reached: %d/%d", int(currentSends), maxAllowedSends)
 	}
 
-	// Increment consecutive sends counter
 	whatsappInstance.Data["consecutive_sends"] = currentSends + 1
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(whatsappInstance *models.WhatsappInstance) error {
+func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	const cooldownMinutes = 5
 
-	// Get last send time from instance data
 	lastSendStr, ok := whatsappInstance.Data["last_send_time"].(string)
 	if !ok {
-		// First message, set current time and allow
 		whatsappInstance.Data["last_send_time"] = time.Now().Format(time.RFC3339)
 		return nil
 	}
@@ -133,10 +132,14 @@ func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(whatsappInstance *models.Wha
 
 	// Check if enough time has passed
 	if time.Since(lastSendTime).Minutes() < cooldownMinutes {
-		return fmt.Errorf("message rate limit: please wait %d minutes between messages", cooldownMinutes)
+		rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
+			"whatsapp_trigger_id": %d,
+			"whatsapp_instance_id": %d
+		}`, whatsappTrigger.ID, whatsappInstance.ID)), cooldownMinutes)
+
+		return fmt.Errorf("message rate limit: the message was scheduled for %d", cooldownMinutes)
 	}
 
-	// Update last send time
 	whatsappInstance.Data["last_send_time"] = time.Now().Format(time.RFC3339)
 	return nil
 }

@@ -34,7 +34,14 @@ func (rmq *RabbitMQ) Setup() error {
 	}
 
 	for _, ex := range exchanges {
-		if err := rmq.DeclareExchange(ex.Name, ex.Type); err != nil {
+		var delayed bool
+		if rmq.Configs.Environment == "development" || rmq.Configs.Environment == "staging" {
+			delayed = false
+		} else {
+			delayed = ex.Name == rmq.Configs.EvolutionAPINotificationExchange
+		}
+
+		if err := rmq.DeclareExchange(ex.Name, ex.Type, delayed); err != nil {
 			return fmt.Errorf("failed to declare exchange %s: %w", ex.Name, err)
 		}
 	}
@@ -120,15 +127,28 @@ func (rmq *RabbitMQ) Consume(queue string) error {
 	return nil
 }
 
-func (rmq *RabbitMQ) DeclareExchange(exchange, exType string) error {
+func (rmq *RabbitMQ) DeclareExchange(exchange, exType string, delayed bool) error {
+	var args amqp.Table
+	var kind string
+
+	if delayed {
+		args = amqp.Table{
+			"x-delayed-type": exType,
+		}
+		kind = "x-delayed-message"
+	} else {
+		args = nil
+		kind = exType
+	}
+
 	err := rmq.Channel.ExchangeDeclare(
 		exchange,
-		exType,
+		kind,
 		true,
 		false,
 		false,
 		false,
-		nil,
+		args,
 	)
 	if err != nil {
 		return err
@@ -161,6 +181,43 @@ func (rmq *RabbitMQ) BindQueue(exchange, routingKey, queue string) error {
 	)
 	if err != nil {
 		return err
+	}
+	return nil
+}
+
+func (rmq *RabbitMQ) Publish(exchange, routingKey string, body []byte) error {
+	err := rmq.Channel.Publish(
+		exchange,
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("[RABBITMQ] - failed to publish message: %w", err)
+	}
+	return nil
+}
+
+func (rmq *RabbitMQ) Schedule(exchange, routingKey string, body []byte, delay int) error {
+	err := rmq.Channel.Publish(
+		exchange,
+		routingKey,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+			Headers: amqp.Table{
+				"x-delay": delay,
+			},
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("[RABBITMQ] - failed to schedule message: %w", err)
 	}
 	return nil
 }
