@@ -159,9 +159,9 @@ func (rwe *ReceiptWhatsappEventUseCase) processRules(data dto.EventProcess, what
 	if err := rwe.maxSentRate(data, whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	// if err := rwe.sleepTime(); err != nil {
-	// 	return err
-	// }
+	if err := rwe.sleepTime(); err != nil {
+		return err
+	}
 	return nil
 }
 
