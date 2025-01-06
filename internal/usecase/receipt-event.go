@@ -16,6 +16,31 @@ import (
 	"gorm.io/gorm"
 )
 
+type MediaMessage struct {
+	MediaType string `json:"mediatype"`
+	MimeType  string `json:"mimetype"`
+	Caption   string `json:"caption"`
+	Media     string `json:"media"`
+	FileName  string `json:"fileName"`
+}
+
+type TextMessage struct {
+	Text string `json:"text"`
+}
+
+type Options struct {
+	Delay       int    `json:"delay"`
+	Presence    string `json:"presence"`
+	LinkPreview bool   `json:"linkPreview"`
+}
+
+type Payload struct {
+	Number       string        `json:"number"`
+	MediaMessage *MediaMessage `json:"mediaMessage"`
+	TextMessage  *TextMessage  `json:"textMessage"`
+	Options      Options       `json:"options"`
+}
+
 type ReceiptWhatsappEventUseCase struct {
 	Ctx      context.Context
 	Configs  *config.Config
@@ -40,6 +65,12 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		log.Printf("Error to decode JSON: %v", err)
 	}
 
+	leadRepo := repositories.NewLeadRepository(rwe.AfrusDB)
+	lead, err := leadRepo.FindById(rwe.Ctx, data.LeadID)
+	if err != nil {
+		return err
+	}
+
 	whatsappInstanceRepo := repositories.NewWhatsappInstanceRepository(rwe.AfrusDB)
 	whatsappInstance, err := whatsappInstanceRepo.GetWhatsappInstanceById(rwe.Ctx, data.WhatsappInstanceID)
 	if err != nil {
@@ -52,16 +83,34 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return err
 	}
 
+	whatsappTriggerAttachmentsRepo := repositories.NewWhatsappTriggerAttachmentRepository(rwe.AfrusDB)
+	attachments, err := whatsappTriggerAttachmentsRepo.GetByTriggerId(rwe.Ctx, whatsappTrigger.ID)
+	if err != nil {
+		return err
+	}
+
 	if err := rwe.processRules(whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
 
-	if err := rwe.SendWhatsappMessage(whatsappInstance, whatsappTrigger); err != nil {
-		return err
+	if len(attachments) == 0 {
+		if err := rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger); err != nil {
+			return err
+		}
+	} else {
+		for _, attachment := range attachments {
+			if err := rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment); err != nil {
+				return err
+			}
+		}
 	}
 
 	if err := whatsappInstanceRepo.Update(rwe.Ctx, whatsappInstance); err != nil {
 		return fmt.Errorf("error updating whatsapp instance data: %v", err)
+	}
+
+	if err := rwe.StoreEvent("sent", data); err != nil {
+		return err
 	}
 
 	log.Printf("[MESSAGE] - Message processed for trigger - [Name: %s / Phone: %s ] \n", whatsappTrigger.Name, whatsappInstance.Owner)
@@ -76,9 +125,9 @@ func (rwe *ReceiptWhatsappEventUseCase) processRules(whatsappInstance *models.Wh
 	if err := rwe.maxSentRate(whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	if err := rwe.sleepTime(); err != nil {
-		return err
-	}
+	// if err := rwe.sleepTime(); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -104,11 +153,14 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *mo
 	}
 
 	if int(currentSends) >= maxAllowedSends {
-		rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
-					"whatsapp_trigger_id": %d,
-					"whatsapp_instance_id": %d
+		if rwe.Configs.Environment == "development" {
+			return nil
+		} else {
+			rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
+				"whatsapp_trigger_id": %d,
+				"whatsapp_instance_id": %d
 				}`, whatsappTrigger.ID, whatsappInstance.ID)), int(time.Minute)*5)
-
+		}
 		return fmt.Errorf("max consecutive sends limit reached: %d/%d", int(currentSends), maxAllowedSends)
 	}
 
@@ -132,10 +184,14 @@ func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(whatsappInstance *models.Wha
 
 	// Check if enough time has passed
 	if time.Since(lastSendTime).Minutes() < cooldownMinutes {
-		rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
-			"whatsapp_trigger_id": %d,
-			"whatsapp_instance_id": %d
-		}`, whatsappTrigger.ID, whatsappInstance.ID)), cooldownMinutes)
+		if rwe.Configs.Environment == "development" {
+			return nil
+		} else {
+			rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
+				"whatsapp_trigger_id": %d,
+				"whatsapp_instance_id": %d
+			}`, whatsappTrigger.ID, whatsappInstance.ID)), cooldownMinutes)
+		}
 
 		return fmt.Errorf("message rate limit: the message was scheduled for %d", cooldownMinutes)
 	}
@@ -150,11 +206,10 @@ func (rwe *ReceiptWhatsappEventUseCase) sleepTime() error {
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappMessage(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
-	// // Send message to Whatsapp API
-	// if err := rwe.Queue.Publish(rwe.Configs.RabbitMQ.WhatsappQueue, whatsappInstance.Owner); err != nil {
-	// 	return fmt.Errorf("error sending message to Whatsapp API: %v", err)
+func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventProcess) error {
+	// eventRepo := repositories.NewWhatsappEventRepository(rwe.EventsDB)
+	// if err := eventRepo.Save(rwe.Ctx, kind, event); err != nil {
+	// 	return fmt.Errorf("error saving event: %v", err)
 	// }
-
 	return nil
 }

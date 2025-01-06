@@ -29,6 +29,8 @@ type Config struct {
 	EventsDBUser                       string `mapstructure:"EVENTS_DB_USER"`
 	EventsDBPassword                   string `mapstructure:"EVENTS_DB_PASSWORD"`
 	EventsDBSSLMode                    string `mapstructure:"EVENTS_DB_SSL_MODE"`
+	EvolutionAPIBaseURL                string `mapstructure:"EVOLUTION_API_BASE_URL"`
+	EvolutionAPIKey                    string `mapstructure:"EVOLUTION_API_KEY"`
 }
 
 func LoadConfig(path string) *Config {
@@ -66,6 +68,8 @@ func LoadConfig(path string) *Config {
 			EventsDBUser:                       os.Getenv("EVENTS_DB_USER"),
 			EventsDBPassword:                   os.Getenv("EVENTS_DB_PASSWORD"),
 			EventsDBSSLMode:                    os.Getenv("EVENTS_DB_SSL_MODE"),
+			EvolutionAPIBaseURL:                os.Getenv("EVOLUTION_API_BASE_URL"),
+			EvolutionAPIKey:                    os.Getenv("EVOLUTION_API_KEY"),
 		}
 	} else {
 		err = viper.Unmarshal(&cfg)

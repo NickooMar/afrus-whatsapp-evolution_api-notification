@@ -30,8 +30,8 @@ func (j *JSONB) Scan(value interface{}) error {
 
 type WhatsappInstance struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
-	InstanceName   string    `gorm:"column:instance_name" json:"instanceName"`
-	InstanceID     string    `gorm:"column:instance_id" json:"instanceId"`
+	InstanceName   string    `gorm:"column:instanceName" json:"instanceName"`
+	InstanceID     string    `gorm:"column:instanceId" json:"instanceId"`
 	Owner          string    `gorm:"column:owner" json:"owner"`
 	Data           JSONB     `gorm:"type:jsonb" json:"data"`
 	OrganizationID uint      `gorm:"column:organization_id" json:"organizationId"`

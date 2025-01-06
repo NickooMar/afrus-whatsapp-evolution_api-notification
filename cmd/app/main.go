@@ -35,7 +35,7 @@ func main() {
 		SSLMode:  conf.AfrusDBSSLMode,
 	}
 
-	if err := dbManager.Connect(db.AfrusDB, afrusConfig, &models.WhatsappTrigger{}, &models.WhatsappInstance{}, &models.WhatsappTriggerAttachment{}); err != nil {
+	if err := dbManager.Connect(db.AfrusDB, afrusConfig, &models.WhatsappTrigger{}, &models.WhatsappTriggerAttachment{}); err != nil {
 		panic(fmt.Sprintf("Failed to connect to Afrus database: %v", err))
 	}
 
@@ -48,7 +48,7 @@ func main() {
 		SSLMode:  conf.EventsDBSSLMode,
 	}
 
-	if err := dbManager.Connect(db.EventsDB, eventsConfig); err != nil {
+	if err := dbManager.Connect(db.EventsDB, eventsConfig, &models.WhatsappSentEvent{}); err != nil {
 		panic(fmt.Sprintf("Failed to connect to Events database: %v", err))
 	}
 
