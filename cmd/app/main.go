@@ -35,7 +35,7 @@ func main() {
 		SSLMode:  conf.AfrusDBSSLMode,
 	}
 
-	if err := dbManager.Connect(db.AfrusDB, afrusConfig, &models.WhatsappTrigger{}, &models.WhatsappInstance{}); err != nil {
+	if err := dbManager.Connect(db.AfrusDB, afrusConfig, &models.WhatsappTrigger{}, &models.WhatsappInstance{}, &models.WhatsappTriggerAttachment{}); err != nil {
 		panic(fmt.Sprintf("Failed to connect to Afrus database: %v", err))
 	}
 
