@@ -90,7 +90,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return err
 	}
 
-	if err := rwe.processRules(whatsappInstance, whatsappTrigger); err != nil {
+	if err := rwe.processRules(data, whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
 
@@ -113,33 +113,33 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		}
 	}
 
-	if err := whatsappInstanceRepo.Update(rwe.Ctx, whatsappInstance); err != nil {
-		return fmt.Errorf("error updating whatsapp instance data: %v", err)
-	}
-
 	if err := rwe.StoreEvent("sent", data, lead, resp); err != nil {
 		return err
 	}
 
-	log.Printf("[MESSAGE] - Message processed for trigger - [Name: %s / Phone: %s ] \n", whatsappTrigger.Name, whatsappInstance.Owner)
+	if err := whatsappInstanceRepo.Update(rwe.Ctx, whatsappInstance); err != nil {
+		return fmt.Errorf("error updating whatsapp instance data: %v", err)
+	}
+
+	log.Printf("[MESSAGE] - Message processed successfully - [Name: %s / Owner: %s / To: %s / Lead: %s] \n", whatsappTrigger.Name, whatsappInstance.Owner, lead.Phone, lead.Email)
 
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) processRules(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
-	if err := rwe.maxConsecutivesSent(whatsappInstance, whatsappTrigger); err != nil {
+func (rwe *ReceiptWhatsappEventUseCase) processRules(data dto.EventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
+	if err := rwe.maxConsecutivesSent(data, whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	if err := rwe.maxSentRate(whatsappInstance, whatsappTrigger); err != nil {
+	if err := rwe.maxSentRate(data, whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	// if err := rwe.sleepTime(); err != nil {
-	// 	return err
-	// }
+	if err := rwe.sleepTime(); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
+func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(data dto.EventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	const (
 		baseMaxSends  = 2
 		maxSendsLimit = 6
@@ -163,10 +163,24 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *mo
 		if rwe.Configs.Environment == "development" {
 			return nil
 		} else {
-			rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
-				"whatsapp_trigger_id": %d,
-				"whatsapp_instance_id": %d
-				}`, whatsappTrigger.ID, whatsappInstance.ID)), int(time.Minute)*5)
+			message := &dto.EventProcess{
+				LeadID:             data.LeadID,
+				OrganizationID:     data.OrganizationID,
+				WhatsappInstanceID: int(whatsappInstance.ID),
+				WhatsappTriggerID:  int(whatsappTrigger.ID),
+			}
+
+			messageBytes, err := json.Marshal(message)
+			if err != nil {
+				return fmt.Errorf("error marshalling message: %v", err)
+			}
+
+			rwe.Queue.Schedule(
+				rwe.Configs.EvolutionAPINotificationExchange,
+				rwe.Configs.EvolutionAPINotificationRoutingKey,
+				messageBytes,
+				int(time.Minute)*5,
+			)
 		}
 		return fmt.Errorf("max consecutive sends limit reached: %d/%d", int(currentSends), maxAllowedSends)
 	}
@@ -175,7 +189,7 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(whatsappInstance *mo
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
+func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(data dto.EventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	const cooldownMinutes = 5
 
 	lastSendStr, ok := whatsappInstance.Data["last_send_time"].(string)
@@ -194,10 +208,24 @@ func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(whatsappInstance *models.Wha
 		if rwe.Configs.Environment == "development" {
 			return nil
 		} else {
-			rwe.Queue.Schedule(rwe.Configs.EvolutionAPINotificationExchange, rwe.Configs.EvolutionAPINotificationRoutingKey, []byte(fmt.Sprintf(`{
-				"whatsapp_trigger_id": %d,
-				"whatsapp_instance_id": %d
-			}`, whatsappTrigger.ID, whatsappInstance.ID)), cooldownMinutes)
+			message := &dto.EventProcess{
+				LeadID:             data.LeadID,
+				OrganizationID:     data.OrganizationID,
+				WhatsappInstanceID: int(whatsappInstance.ID),
+				WhatsappTriggerID:  int(whatsappTrigger.ID),
+			}
+
+			messageBytes, err := json.Marshal(message)
+			if err != nil {
+				return fmt.Errorf("error marshalling message: %v", err)
+			}
+
+			rwe.Queue.Schedule(
+				rwe.Configs.EvolutionAPINotificationExchange,
+				rwe.Configs.EvolutionAPINotificationRoutingKey,
+				messageBytes,
+				cooldownMinutes,
+			)
 		}
 
 		return fmt.Errorf("message rate limit: the message was scheduled for %d", cooldownMinutes)
