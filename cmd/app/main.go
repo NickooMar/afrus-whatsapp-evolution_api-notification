@@ -97,6 +97,8 @@ func messageHandler(ctx context.Context, config *config.Config, msgs <-chan *amq
 				continue
 			}
 
+			log.Printf("[INFO] - Received message\n")
+
 			handler := usecase.NewReceiptWhatsappEventUseCase(ctx, config, queue, afrusDB, eventsDB)
 			if err := handler.Execute(string(msg.Body)); err != nil {
 				log.Printf("[ERROR] - Error processing message: %v", err)
