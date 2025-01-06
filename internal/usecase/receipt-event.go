@@ -99,6 +99,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 	if len(attachments) == 0 {
 		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger)
 		if err != nil {
+			rwe.StoreEvent("failed", data, lead, resp)
 			return err
 		}
 
@@ -106,6 +107,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		for _, attachment := range attachments {
 			resp, err = rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment)
 			if err != nil {
+				rwe.StoreEvent("failed", data, lead, resp)
 				return err
 			}
 		}
@@ -131,10 +133,9 @@ func (rwe *ReceiptWhatsappEventUseCase) processRules(whatsappInstance *models.Wh
 	if err := rwe.maxSentRate(whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
-	// if err := rwe.sleepTime(); err != nil {
-	// 	return err
-	// }
-
+	if err := rwe.sleepTime(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -224,7 +225,7 @@ func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventPr
 		return fmt.Errorf("error unmarshalling event response: %v", err)
 	}
 
-	event := models.WhatsappEvent{
+	event := &models.WhatsappEvent{
 		LeadID:         data.LeadID,
 		OrganizationID: data.OrganizationID,
 		PhoneNumber:    lead.Phone,
