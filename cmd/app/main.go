@@ -48,7 +48,7 @@ func main() {
 		SSLMode:  conf.EventsDBSSLMode,
 	}
 
-	if err := dbManager.Connect(db.EventsDB, eventsConfig, &models.WhatsappSentEvent{}); err != nil {
+	if err := dbManager.Connect(db.EventsDB, eventsConfig); err != nil {
 		panic(fmt.Sprintf("Failed to connect to Events database: %v", err))
 	}
 

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"golang.org/x/exp/rand"
@@ -93,13 +94,18 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return err
 	}
 
+	var resp *WhatsappResponse
+
 	if len(attachments) == 0 {
-		if err := rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger); err != nil {
+		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger)
+		if err != nil {
 			return err
 		}
+
 	} else {
 		for _, attachment := range attachments {
-			if err := rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment); err != nil {
+			resp, err = rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment)
+			if err != nil {
 				return err
 			}
 		}
@@ -109,7 +115,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return fmt.Errorf("error updating whatsapp instance data: %v", err)
 	}
 
-	if err := rwe.StoreEvent("sent", data); err != nil {
+	if err := rwe.StoreEvent("sent", data, lead, resp); err != nil {
 		return err
 	}
 
@@ -206,10 +212,32 @@ func (rwe *ReceiptWhatsappEventUseCase) sleepTime() error {
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventProcess) error {
-	// eventRepo := repositories.NewWhatsappEventRepository(rwe.EventsDB)
-	// if err := eventRepo.Save(rwe.Ctx, kind, event); err != nil {
-	// 	return fmt.Errorf("error saving event: %v", err)
-	// }
+func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventProcess, lead *models.Lead, resp *WhatsappResponse) error {
+	eventRepo := repositories.NewWhatsappEventRepository(rwe.EventsDB)
+
+	var eventMap models.JSONB
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return fmt.Errorf("error marshalling event response: %v", err)
+	}
+	if err := json.Unmarshal(respBytes, &eventMap); err != nil {
+		return fmt.Errorf("error unmarshalling event response: %v", err)
+	}
+
+	event := models.WhatsappEvent{
+		LeadID:         data.LeadID,
+		OrganizationID: data.OrganizationID,
+		PhoneNumber:    lead.Phone,
+		ExternalID:     strconv.Itoa(data.WhatsappInstanceID),
+		ExternalTable:  "whatsapp_triggers",
+		MessageID:      resp.Key.ID,
+		EventType:      1,
+		DateEvent:      time.Now().Format(time.RFC3339),
+		Event:          eventMap,
+	}
+
+	if err := eventRepo.Save(rwe.Ctx, kind, event); err != nil {
+		return fmt.Errorf("error saving event: %v", err)
+	}
 	return nil
 }

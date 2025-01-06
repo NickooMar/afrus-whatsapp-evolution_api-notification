@@ -22,7 +22,7 @@ func NewWhatsappEventRepository(db *gorm.DB) *WhatsappEventRepository {
 
 func (repo *WhatsappEventRepository) Save(ctx context.Context, dbName string, whatsappEvent models.WhatsappEvent) error {
 	tableName := fmt.Sprintf("whatsapp.%s", dbName)
-	result := repo.DB.Table(tableName).Create(whatsappEvent)
+	result := repo.DB.Table(tableName).Create(&whatsappEvent)
 	if result.Error != nil {
 		return result.Error
 	}
