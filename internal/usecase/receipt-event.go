@@ -107,11 +107,11 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 
 	// TODO: Move this to a helper function
 	if len(attachments) == 0 {
-		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger)
+		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger, data)
 		if err != nil {
 			fmt.Printf("Failed to send message in main instance %s - %v\n", whatsappInstance.InstanceName, err)
 			for _, instance := range whatsappInstances {
-				resp, err = rwe.SendWhatsappTextMessage(lead, &instance, whatsappTrigger)
+				resp, err = rwe.SendWhatsappTextMessage(lead, &instance, whatsappTrigger, data)
 				if err != nil {
 					fmt.Printf("[Failed to send message in %s] - %v\n", instance.InstanceName, err)
 				} else {
@@ -134,7 +134,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		}
 	} else {
 		for _, attachment := range attachments {
-			resp, err = rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment)
+			resp, err = rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment, data)
 			if err != nil {
 				fmt.Printf("[Failed to send media message to main instance %s] - %v\n", whatsappInstance.InstanceName, err)
 				if storeErr := rwe.StoreEvent("failed", data, lead, resp); storeErr != nil {

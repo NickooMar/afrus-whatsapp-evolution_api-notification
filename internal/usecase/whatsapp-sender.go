@@ -1,6 +1,7 @@
 package usecase
 
 import (
+	"afrus-whatsapp-evolution_api-notification/internal/application/dto"
 	"afrus-whatsapp-evolution_api-notification/internal/domain/models"
 	"encoding/json"
 	"fmt"
@@ -81,7 +82,7 @@ func (rwe *ReceiptWhatsappEventUseCase) sendRequest(requestUrl string, payloadBy
 	return &whatsappResponse, nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappMediaMessage(lead *models.Lead, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger, attachment models.WhatsappTriggerAttachment) (*WhatsappResponse, error) {
+func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappMediaMessage(lead *models.Lead, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger, attachment models.WhatsappTriggerAttachment, data dto.EventProcess) (*WhatsappResponse, error) {
 	requestUrl := fmt.Sprintf("%s/message/sendMedia/%s", strings.TrimSuffix(rwe.Configs.EvolutionAPIBaseURL, "/"), whatsappInstance.InstanceName)
 
 	mediaType := mediaTypeUnknown
@@ -93,6 +94,13 @@ func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappMediaMessage(lead *models.Le
 		mimeType = mediaTypeMap[mediaKey]
 	}
 
+	var content string
+	if data.Content != "" {
+		content = data.Content
+	} else {
+		content = whatsappTrigger.Content
+	}
+
 	to := rwe.FormatLeadPhone(lead)
 
 	body := Payload{
@@ -100,7 +108,7 @@ func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappMediaMessage(lead *models.Le
 		MediaMessage: &MediaMessage{
 			MediaType: mediaType,
 			MimeType:  mimeType,
-			Caption:   whatsappTrigger.Content,
+			Caption:   content,
 			Media:     attachment.Content,
 			FileName:  attachment.Filename,
 		},
@@ -118,15 +126,22 @@ func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappMediaMessage(lead *models.Le
 	return rwe.sendRequest(requestUrl, payloadBytes)
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappTextMessage(lead *models.Lead, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) (*WhatsappResponse, error) {
+func (rwe *ReceiptWhatsappEventUseCase) SendWhatsappTextMessage(lead *models.Lead, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger, data dto.EventProcess) (*WhatsappResponse, error) {
 	requestUrl := fmt.Sprintf("%s/message/sendText/%s", strings.TrimSuffix(rwe.Configs.EvolutionAPIBaseURL, "/"), whatsappInstance.InstanceName)
+
+	var content string
+	if data.Content != "" {
+		content = data.Content
+	} else {
+		content = whatsappTrigger.Content
+	}
 
 	to := rwe.FormatLeadPhone(lead)
 
 	body := Payload{
 		Number: to,
 		TextMessage: &TextMessage{
-			Text: whatsappTrigger.Content,
+			Text: content,
 		},
 		Options: Options{
 			Delay:       0,
