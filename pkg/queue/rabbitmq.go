@@ -2,6 +2,7 @@ package queue
 
 import (
 	config "afrus-whatsapp-evolution_api-notification/configs"
+	"context"
 	"fmt"
 	"log"
 
@@ -185,8 +186,9 @@ func (rmq *RabbitMQ) BindQueue(exchange, routingKey, queue string) error {
 	return nil
 }
 
-func (rmq *RabbitMQ) Publish(exchange, routingKey string, body []byte) error {
-	err := rmq.Channel.Publish(
+func (rmq *RabbitMQ) Publish(ctx context.Context, exchange, routingKey string, body []byte) error {
+	err := rmq.Channel.PublishWithContext(
+		ctx,
 		exchange,
 		routingKey,
 		false,

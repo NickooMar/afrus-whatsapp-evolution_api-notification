@@ -1,5 +1,7 @@
 package protocols
 
+import "context"
+
 type Queue interface {
 	Dial() error
 	Setup() error
@@ -7,7 +9,7 @@ type Queue interface {
 	Consume(queue string) error
 	DeclareQueue(queue string) error
 	BindQueue(exchange, routingKey, queue string) error
-	Publish(exchange, routingKey string, body []byte) error
+	Publish(ctx context.Context, exchange, routingKey string, body []byte) error
 	DeclareExchange(exchange, kind string, delayed bool) error
 	Schedule(exchange, routingKey string, body []byte, delay int) error
 }

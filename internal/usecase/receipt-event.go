@@ -148,6 +148,11 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		}
 	}
 
+	err = rwe.SendEventToBilling()
+	if err != nil {
+		return err
+	}
+
 	log.Printf("[MESSAGE] - Message processed successfully - [Name: %s / Owner: %s / To: %s / Lead: %s] \n", whatsappTrigger.Name, whatsappInstance.Owner, lead.Phone, lead.Email)
 
 	return nil
@@ -299,6 +304,14 @@ func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventPr
 
 	if err := eventRepo.Save(rwe.Ctx, kind, event); err != nil {
 		return fmt.Errorf("error saving event: %v", err)
+	}
+	return nil
+}
+
+func (rwe *ReceiptWhatsappEventUseCase) SendEventToBilling() error {
+	err := rwe.Queue.Publish(rwe.Ctx, rwe.Configs.RabbitMQBillingExchange, rwe.Configs.RabbitMQBillingRoutingKey, []byte("receipt"))
+	if err != nil {
+		return err
 	}
 	return nil
 }

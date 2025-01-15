@@ -17,6 +17,9 @@ type Config struct {
 	EvolutionAPINotificationQueue      string `mapstructure:"RABBITMQ_EVOLUTION_API_NOTIFICATION_QUEUE"`
 	EvolutionAPINotificationExchange   string `mapstructure:"RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE"`
 	EvolutionAPINotificationRoutingKey string `mapstructure:"RABBITMQ_EVOLUTION_API_NOTIFICATION_ROUTING_KEY"`
+	RabbitMQBillingExchange            string `mapstructure:"RABBITMQ_BILLING_EXCHANGE"`
+	RabbitMQBillingQueue               string `mapstructure:"RABBITMQ_BILLING_QUEUE"`
+	RabbitMQBillingRoutingKey          string `mapstructure:"RABBITMQ_BILLING_ROUTING_KEY"`
 	AfrusDBHost                        string `mapstructure:"AFRUS_DB_HOST"`
 	AfrusDBPort                        string `mapstructure:"AFRUS_DB_PORT"`
 	AfrusDBName                        string `mapstructure:"AFRUS_DB_NAME"`
@@ -56,6 +59,9 @@ func LoadConfig(path string) *Config {
 			EvolutionAPINotificationQueue:      os.Getenv("RABBITMQ_EVOLUTION_API_NOTIFICATION_QUEUE"),
 			EvolutionAPINotificationExchange:   os.Getenv("RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE"),
 			EvolutionAPINotificationRoutingKey: os.Getenv("RABBITMQ_EVOLUTION_API_NOTIFICATION_ROUTING_KEY"),
+			RabbitMQBillingExchange:            os.Getenv("RABBITMQ_BILLING_EXCHANGE"),
+			RabbitMQBillingQueue:               os.Getenv("RABBITMQ_BILLING_QUEUE"),
+			RabbitMQBillingRoutingKey:          os.Getenv("RABBITMQ_BILLING_ROUTING_KEY"),
 			AfrusDBHost:                        os.Getenv("AFRUS_DB_HOST"),
 			AfrusDBPort:                        os.Getenv("AFRUS_DB_PORT"),
 			AfrusDBName:                        os.Getenv("AFRUS_DB_NAME"),
