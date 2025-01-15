@@ -3,6 +3,7 @@ package repositories
 import (
 	"afrus-whatsapp-evolution_api-notification/internal/domain/models"
 	"context"
+	"fmt"
 
 	"gorm.io/gorm"
 )
@@ -42,9 +43,11 @@ func (repo *WhatsappInstanceRepository) GetWhatsappInstanceById(ctx context.Cont
 
 func (repo *WhatsappInstanceRepository) GetWhatsappInstancesByOrganization(ctx context.Context, whatsappInstance *models.WhatsappInstance) ([]models.WhatsappInstance, error) {
 	var instances []models.WhatsappInstance
-	result := repo.db.WithContext(ctx).Where("organization_id = ? AND id != ?", whatsappInstance.OrganizationID, whatsappInstance.ID).Find(&instances)
+	result := repo.db.WithContext(ctx).Where("organization_id = ? AND id != ?", whatsappInstance.OrganizationID, whatsappInstance.ID).Order("created_at ASC").Find(&instances)
 	if result.Error != nil {
 		return nil, result.Error
 	}
+
+	fmt.Printf("Whatsapp instances: %v\n", instances)
 	return instances, nil
 }
