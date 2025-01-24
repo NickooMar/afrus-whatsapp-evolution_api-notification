@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"golang.org/x/exp/rand"
@@ -56,14 +57,16 @@ func (rbu *ReceiptBlastEventUseCase) Execute(event string) error {
 		return err
 	}
 
-	for _, instance := range communicationWhatsapp.Instances {
-		err := rbu.processRules(&instance.WhatsappInstance)
-		if err != nil {
-			log.Printf("Error processing rules: %v - Trying with the next instance", err)
-			continue
-		}
+	var resp *services.WhatsappResponse
 
-		err = rbu.sendMessage(data, &instance.WhatsappInstance, lead, communicationWhatsapp)
+	for _, instance := range communicationWhatsapp.Instances {
+		// err := rbu.processRules(&instance.WhatsappInstance)
+		// if err != nil {
+		// 	log.Printf("Error processing rules: %v - Trying with the next instance", err)
+		// 	continue
+		// }
+
+		resp, err = rbu.sendMessage(data, &instance.WhatsappInstance, lead, communicationWhatsapp)
 		if err != nil {
 			log.Printf("Error sending message: %v - Trying with the next instance", err)
 			continue
@@ -71,18 +74,22 @@ func (rbu *ReceiptBlastEventUseCase) Execute(event string) error {
 
 		// If message is sent successfully, break the loop
 		log.Printf("[BLAST] - Message sent successfully with instance: %v to: %s", instance.WhatsappInstance.InstanceName, lead.Email)
+
+		rbu.StoreEvent("sent", data, lead, resp)
+
 		break
 	}
 
 	return nil
 }
 
-func (rbu *ReceiptBlastEventUseCase) sendMessage(data dto.BlastEventProcess, instance *models.WhatsappInstance, lead *models.Lead, communication *models.CommunicationWhatsapp) error {
+func (rbu *ReceiptBlastEventUseCase) sendMessage(data dto.BlastEventProcess, instance *models.WhatsappInstance, lead *models.Lead, communication *models.CommunicationWhatsapp) (*services.WhatsappResponse, error) {
 	log.Printf("[BLAST] - Sending message to: %s %s \n", lead.Email, lead.Phone)
 
-	_, err := rbu.whatsappSenderService.SendWhatsappTextMessage(lead, instance, data.Content)
+	resp, err := rbu.whatsappSenderService.SendWhatsappTextMessage(lead, instance, data.Content)
 	if err != nil {
-		return err
+		rbu.StoreEvent("failed", data, lead, nil)
+		return nil, err
 	}
 
 	for _, attachment := range communication.Attachments {
@@ -104,6 +111,44 @@ func (rbu *ReceiptBlastEventUseCase) sendMessage(data dto.BlastEventProcess, ins
 			}
 		}
 	}
+
+	return resp, nil
+}
+
+func (rbu *ReceiptBlastEventUseCase) StoreEvent(kind string, data dto.BlastEventProcess, lead *models.Lead, resp *services.WhatsappResponse) error {
+	eventRepo := repositories.NewWhatsappEventRepository(rbu.EventsDB)
+
+	var messageID = ""
+	if resp != nil {
+		messageID = resp.Key.ID
+	}
+
+	var eventMap models.JSONB
+	respBytes, err := json.Marshal(resp)
+	if err != nil {
+		return fmt.Errorf("error marshalling event response: %v", err)
+	}
+	if err := json.Unmarshal(respBytes, &eventMap); err != nil {
+		return fmt.Errorf("error unmarshalling event response: %v", err)
+	}
+
+	event := &models.WhatsappEvent{
+		LeadID:         data.LeadID,
+		OrganizationID: data.OrganizationID,
+		PhoneNumber:    lead.Phone,
+		ExternalID:     strconv.Itoa(data.CommunicationWhatsappId),
+		ExternalTable:  "communication_whatsapps",
+		MessageID:      messageID,
+		EventType:      1,
+		DateEvent:      time.Now().Format(time.RFC3339),
+		Event:          eventMap,
+	}
+
+	if err := eventRepo.Save(rbu.Ctx, kind, event); err != nil {
+		return fmt.Errorf("[EVENT] - error saving event: %v", err)
+	}
+
+	log.Printf("[EVENT] - Event of type: '%s' for communicationWhatsappId: '%d' saved successfully", kind, data.CommunicationWhatsappId)
 
 	return nil
 }

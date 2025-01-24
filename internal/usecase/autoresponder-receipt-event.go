@@ -290,7 +290,7 @@ func (rwe *ReceiptAutoresponderEventUseCase) StoreEvent(kind string, data dto.Au
 	}
 
 	if err := eventRepo.Save(rwe.Ctx, kind, event); err != nil {
-		return fmt.Errorf("error saving event: %v", err)
+		return fmt.Errorf("[EVENT] - error saving event: %v", err)
 	}
 	return nil
 }
