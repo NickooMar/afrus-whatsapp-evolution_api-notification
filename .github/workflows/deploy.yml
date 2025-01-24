@@ -24,48 +24,46 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY_STAGING }}
           command_timeout: 30m
           script: |
-            cd ~/afrus-exports
+            cd ~/afrus-whatsapp-evolution_api-notification
 
             # 2. Update project
             git pull origin staging
 
             # 3. Build Docker image
-            sudo docker build -t afrus-exports \
+            sudo docker build -t afrus-whatsapp-evolution_api-notification \
               --build-arg ENVIRONMENT="${{ secrets.ENVIRONMENT_STAGING }}" \
-              --build-arg APP_KEY="${{ secrets.APP_KEY_STAGING }}" \
               --build-arg SERVER_PORT="${{ secrets.SERVER_PORT_STAGING }}" \
               --build-arg RABBITMQ_URL="${{ secrets.RABBITMQ_URL_STAGING }}" \
               --build-arg RABBITMQ_PORT="${{ secrets.RABBITMQ_PORT_STAGING }}" \
               --build-arg RABBITMQ_USER="${{ secrets.RABBITMQ_USER_STAGING }}" \
               --build-arg RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD_STAGING }}" \
               --build-arg RABBITMQ_MANAGER_PORT="${{ secrets.RABBITMQ_MANAGER_PORT_STAGING }}" \
-              --build-arg EXPORTS_QUEUE="${{ secrets.EXPORTS_QUEUE_STAGING }}" \
-              --build-arg TAG_LEADS_QUEUE="${{ secrets.TAG_LEADS_QUEUE_STAGING  }}" \
-              --build-arg DELETE_LEADS_QUEUE="${{ secrets.DELETE_LEADS_QUEUE_STAGING  }}" \
-              --build-arg EXPORTS_EXCHANGE="${{ secrets.EXPORTS_EXCHANGE_STAGING }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE_STAGING }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE_STAGING }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY_STAGING }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE_STAGING }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY_STAGING }}" \
+              --build-arg RABBITMQ_BILLING_EXCHANGE="${{ secrets.RABBITMQ_BILLING_EXCHANGE_STAGING }}" \
+              --build-arg RABBITMQ_BILLING_QUEUE="${{ secrets.RABBITMQ_BILLING_QUEUE_STAGING }}" \
+              --build-arg RABBITMQ_BILLING_ROUTING_KEY="${{ secrets.RABBITMQ_BILLING_ROUTING_KEY_STAGING }}" \
               --build-arg AFRUS_DB_USER="${{ secrets.AFRUS_DB_USER_STAGING }}" \
               --build-arg AFRUS_DB_HOST="${{ secrets.AFRUS_DB_HOST_STAGING }}" \
               --build-arg AFRUS_DB_PORT="${{ secrets.AFRUS_DB_PORT_STAGING }}" \
               --build-arg AFRUS_DB_NAME="${{ secrets.AFRUS_DB_NAME_STAGING }}" \
               --build-arg AFRUS_DB_SSL_MODE="${{ secrets.AFRUS_DB_SSL_MODE_STAGING }}" \
               --build-arg AFRUS_DB_PASSWORD="${{ secrets.AFRUS_DB_PASSWORD_STAGING }}" \
-              --build-arg VAULT_DB_USER="${{ secrets.VAULT_DB_USER_STAGING }}" \
-              --build-arg VAULT_DB_HOST="${{ secrets.VAULT_DB_HOST_STAGING }}" \
-              --build-arg VAULT_DB_PORT="${{ secrets.VAULT_DB_PORT_STAGING }}" \
-              --build-arg VAULT_DB_SSL_MODE="${{ secrets.VAULT_DB_SSL_MODE_STAGING }}" \
-              --build-arg VAULT_DB_PASSWORD="${{ secrets.VAULT_DB_PASSWORD_STAGING }}" \
-              --build-arg ANALYTICS_DB_NAME="${{ secrets.ANALYTICS_DB_NAME_STAGING }}" \
-              --build-arg AWS_S3_KEY="${{ secrets.AWS_S3_KEY_STAGING }}" \
-              --build-arg AWS_S3_SECRET="${{ secrets.AWS_S3_SECRET_STAGING }}" \
-              --build-arg AWS_S3_REGION="${{ secrets.AWS_S3_REGION_STAGING}}" \
-              --build-arg AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET_STAGING }}" \
-              --build-arg REDIS_HOST="${{ secrets.REDIS_HOST_STAGING }}" \
-              --build-arg REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD_STAGING }}" \
-              --build-arg REDIS_PORT="${{ secrets.REDIS_PORT_STAGING }}" \
+              --build-arg EVENTS_DB_USER="${{ secrets.EVENTS_DB_USER_STAGING }}" \
+              --build-arg EVENTS_DB_HOST="${{ secrets.EVENTS_DB_HOST_STAGING }}" \
+              --build-arg EVENTS_DB_PORT="${{ secrets.EVENTS_DB_PORT_STAGING }}" \
+              --build-arg EVENTS_DB_SSL_MODE="${{ secrets.EVENTS_DB_SSL_MODE_STAGING }}" \
+              --build-arg EVENTS_DB_PASSWORD="${{ secrets.EVENTS_DB_PASSWORD_STAGING }}" \
+              --build-arg EVENTS_DB_NAME="${{ secrets.EVENTS_DB_NAME_STAGING }}" \
+              --build-arg EVOLUTION_API_BASE_URL="${{ secrets.EVOLUTION_API_BASE_URL_STAGING }}" \
+              --build-arg EVOLUTION_API_KEY="${{ secrets.EVOLUTION_API_KEY_STAGING }}" \
               -f ./Dockerfile.prod .
 
             # 4. Stop and remove existing container 
-            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-exports")
+            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-whatsapp-evolution_api-notification")
             if [ -n "$CONTAINER_ID" ]; then
               sudo docker stop $CONTAINER_ID
               sudo docker rm $CONTAINER_ID
@@ -75,39 +73,37 @@ jobs:
             sudo systemctl restart nginx
 
             # 5. Run new container
-            sudo docker run -d --name afrus-exports --network host \
-              -e SERVER_PORT="${{ secrets.ENVIRONMENT_STAGING }}" \
-              -e APP_KEY="${{ secrets.APP_KEY_STAGING }}" \
+            sudo docker run -d --name afrus-whatsapp-evolution_api-notification --network host \
+              -e ENVIRONMENT="${{ secrets.ENVIRONMENT_STAGING }}" \
               -e SERVER_PORT="${{ secrets.SERVER_PORT_STAGING }}" \
               -e RABBITMQ_URL="${{ secrets.RABBITMQ_URL_STAGING }}" \
               -e RABBITMQ_PORT="${{ secrets.RABBITMQ_PORT_STAGING }}" \
               -e RABBITMQ_USER="${{ secrets.RABBITMQ_USER_STAGING}}" \
               -e RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD_STAGING }}" \
               -e RABBITMQ_MANAGER_PORT="${{ secrets.RABBITMQ_MANAGER_PORT_STAGING }}" \
-              -e EXPORTS_QUEUE="${{ secrets.EXPORTS_QUEUE_STAGING }}" \
-              -e DELETE_LEADS_QUEUE="${{ secrets.DELETE_LEADS_QUEUE_STAGING }}" \
-              -e TAG_LEADS_QUEUE="${{ secrets.TAG_LEADS_QUEUE_STAGING }}" \
-              -e EXPORTS_EXCHANGE="${{ secrets.EXPORTS_EXCHANGE_STAGING }}" \
+              -e RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE_STAGING }}" \
+              -e RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE_STAGING }}" \
+              -e RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY_STAGING }}" \
+              -e RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE_STAGING }}" \
+              -e RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY_STAGING }}" \
+              -e RABBITMQ_BILLING_EXCHANGE="${{ secrets.RABBITMQ_BILLING_EXCHANGE_STAGING }}" \
+              -e RABBITMQ_BILLING_QUEUE="${{ secrets.RABBITMQ_BILLING_QUEUE_STAGING }}" \
+              -e RABBITMQ_BILLING_ROUTING_KEY="${{ secrets.RABBITMQ_BILLING_ROUTING_KEY_STAGING }}" \
               -e AFRUS_DB_USER="${{ secrets.AFRUS_DB_USER_STAGING }}" \
               -e AFRUS_DB_HOST="${{ secrets.AFRUS_DB_HOST_STAGING }}" \
               -e AFRUS_DB_PORT="${{ secrets.AFRUS_DB_PORT_STAGING }}" \
               -e AFRUS_DB_NAME="${{ secrets.AFRUS_DB_NAME_STAGING }}" \
               -e AFRUS_DB_SSL_MODE="${{ secrets.AFRUS_DB_SSL_MODE_STAGING }}" \
               -e AFRUS_DB_PASSWORD="${{ secrets.AFRUS_DB_PASSWORD_STAGING }}" \
-              -e VAULT_DB_USER="${{ secrets.VAULT_DB_USER_STAGING }}" \
-              -e VAULT_DB_HOST="${{ secrets.VAULT_DB_HOST_STAGING }}" \
-              -e VAULT_DB_PORT="${{ secrets.VAULT_DB_PORT_STAGING }}" \
-              -e VAULT_DB_SSL_MODE="${{ secrets.VAULT_DB_SSL_MODE_STAGING }}" \
-              -e VAULT_DB_PASSWORD="${{ secrets.VAULT_DB_PASSWORD_STAGING }}" \
-              -e ANALYTICS_DB_NAME="${{ secrets.ANALYTICS_DB_NAME_STAGING }}" \
-              -e AWS_S3_KEY="${{ secrets.AWS_S3_KEY_STAGING }}" \
-              -e AWS_S3_SECRET="${{ secrets.AWS_S3_SECRET_STAGING }}" \
-              -e AWS_S3_REGION="${{ secrets.AWS_S3_REGION_STAGING }}" \
-              -e AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET_STAGING }}" \
-              -e REDIS_HOST="${{ secrets.REDIS_HOST_STAGING }}" \
-              -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD_STAGING }}" \
-              -e REDIS_PORT="${{ secrets.REDIS_PORT_STAGING }}" \
-              afrus-exports
+              -e EVENTS_DB_USER="${{ secrets.EVENTS_DB_USER_STAGING }}" \
+              -e EVENTS_DB_HOST="${{ secrets.EVENTS_DB_HOST_STAGING }}" \
+              -e EVENTS_DB_PORT="${{ secrets.EVENTS_DB_PORT_STAGING }}" \
+              -e EVENTS_DB_SSL_MODE="${{ secrets.EVENTS_DB_SSL_MODE_STAGING }}" \
+              -e EVENTS_DB_PASSWORD="${{ secrets.EVENTS_DB_PASSWORD_STAGING }}" \
+              -e EVENTS_DB_NAME="${{ secrets.EVENTS_DB_NAME_STAGING }}" \
+              -e EVOLUTION_API_BASE_URL="${{ secrets.EVOLUTION_API_BASE_URL_STAGING }}" \
+              -e EVOLUTION_API_KEY="${{ secrets.EVOLUTION_API_KEY_STAGING }}" \
+              afrus-whatsapp-evolution_api-notification
 
       - name: Send Discord
         env:
@@ -132,48 +128,46 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 30m
           script: |
-            cd ~/afrus-exports
+            cd ~/afrus-whatsapp-evolution_api-notification
 
             # 2. Update project
             git pull origin main
 
             # 3. Build Docker image
-            sudo docker build -t afrus-exports \
-              --build-arg SERVER_PORT="${{ secrets.ENVIRONMENT }}" \
-              --build-arg APP_KEY="${{ secrets.APP_KEY }}" \
+            sudo docker build -t afrus-whatsapp-evolution_api-notification \
+              --build-arg ENVIRONMENT="${{ secrets.ENVIRONMENT }}" \
               --build-arg SERVER_PORT="${{ secrets.SERVER_PORT }}" \
               --build-arg RABBITMQ_URL="${{ secrets.RABBITMQ_URL }}" \
               --build-arg RABBITMQ_PORT="${{ secrets.RABBITMQ_PORT }}" \
               --build-arg RABBITMQ_USER="${{ secrets.RABBITMQ_USER }}" \
               --build-arg RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}" \
               --build-arg RABBITMQ_MANAGER_PORT="${{ secrets.RABBITMQ_MANAGER_PORT }}" \
-              --build-arg EXPORTS_QUEUE="${{ secrets.EXPORTS_QUEUE }}" \
-              --build-arg TAG_LEADS_QUEUE="${{ secrets.TAG_LEADS_QUEUE  }}" \
-              --build-arg DELETE_LEADS_QUEUE="${{ secrets.DELETE_LEADS_QUEUE  }}" \
-              --build-arg EXPORTS_EXCHANGE="${{ secrets.EXPORTS_EXCHANGE }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE }}" \
+              --build-arg RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY }}" \
+              --build-arg RABBITMQ_BILLING_EXCHANGE="${{ secrets.RABBITMQ_BILLING_EXCHANGE }}" \
+              --build-arg RABBITMQ_BILLING_QUEUE="${{ secrets.RABBITMQ_BILLING_QUEUE }}" \
+              --build-arg RABBITMQ_BILLING_ROUTING_KEY="${{ secrets.RABBITMQ_BILLING_ROUTING_KEY }}" \
               --build-arg AFRUS_DB_USER="${{ secrets.AFRUS_DB_USER }}" \
               --build-arg AFRUS_DB_HOST="${{ secrets.AFRUS_DB_HOST }}" \
               --build-arg AFRUS_DB_PORT="${{ secrets.AFRUS_DB_PORT }}" \
               --build-arg AFRUS_DB_NAME="${{ secrets.AFRUS_DB_NAME }}" \
               --build-arg AFRUS_DB_SSL_MODE="${{ secrets.AFRUS_DB_SSL_MODE }}" \
               --build-arg AFRUS_DB_PASSWORD="${{ secrets.AFRUS_DB_PASSWORD }}" \
-              --build-arg VAULT_DB_USER="${{ secrets.VAULT_DB_USER }}" \
-              --build-arg VAULT_DB_HOST="${{ secrets.VAULT_DB_HOST }}" \
-              --build-arg VAULT_DB_PORT="${{ secrets.VAULT_DB_PORT }}" \
-              --build-arg VAULT_DB_SSL_MODE="${{ secrets.VAULT_DB_SSL_MODE }}" \
-              --build-arg VAULT_DB_PASSWORD="${{ secrets.VAULT_DB_PASSWORD }}" \
-              --build-arg ANALYTICS_DB_NAME="${{ secrets.ANALYTICS_DB_NAME }}" \
-              --build-arg AWS_S3_KEY="${{ secrets.AWS_S3_KEY }}" \
-              --build-arg AWS_S3_SECRET="${{ secrets.AWS_S3_SECRET }}" \
-              --build-arg AWS_S3_REGION="${{ secrets.AWS_S3_REGION }}" \
-              --build-arg AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}" \
-              --build-arg REDIS_HOST="${{ secrets.REDIS_HOST }}" \
-              --build-arg REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
-              --build-arg REDIS_PORT="${{ secrets.REDIS_PORT }}" \
+              --build-arg EVENTS_DB_USER="${{ secrets.EVENTS_DB_USER }}" \
+              --build-arg EVENTS_DB_HOST="${{ secrets.EVENTS_DB_HOST }}" \
+              --build-arg EVENTS_DB_PORT="${{ secrets.EVENTS_DB_PORT }}" \
+              --build-arg EVENTS_DB_SSL_MODE="${{ secrets.EVENTS_DB_SSL_MODE }}" \
+              --build-arg EVENTS_DB_PASSWORD="${{ secrets.EVENTS_DB_PASSWORD }}" \
+              --build-arg EVENTS_DB_NAME="${{ secrets.EVENTS_DB_NAME }}" \
+              --build-arg EVOLUTION_API_BASE_URL="${{ secrets.EVOLUTION_API_BASE_URL }}" \
+              --build-arg EVOLUTION_API_KEY="${{ secrets.EVOLUTION_API_KEY }}" \
               -f ./Dockerfile.prod .
 
             # 4. Stop and remove existing container 
-            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-exports")
+            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-whatsapp-evolution_api-notification")
             if [ -n "$CONTAINER_ID" ]; then
               sudo docker stop $CONTAINER_ID
               sudo docker rm $CONTAINER_ID
@@ -183,39 +177,37 @@ jobs:
             sudo systemctl restart nginx
 
             # 5. Run new container
-            sudo docker run -d --name afrus-exports --network host \
-              -e SERVER_PORT="${{ secrets.ENVIRONMENT }}" \
-              -e APP_KEY="${{ secrets.APP_KEY }}" \
-              -e SERVER_PORT="${{ secrets.SERVER_PORT }}" \
-              -e RABBITMQ_URL="${{ secrets.RABBITMQ_URL }}" \
-              -e RABBITMQ_PORT="${{ secrets.RABBITMQ_PORT }}" \
-              -e RABBITMQ_USER="${{ secrets.RABBITMQ_USER }}" \
-              -e RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}" \
-              -e RABBITMQ_MANAGER_PORT="${{ secrets.RABBITMQ_MANAGER_PORT }}" \
-              -e EXPORTS_QUEUE="${{ secrets.EXPORTS_QUEUE }}" \
-              -e DELETE_LEADS_QUEUE="${{ secrets.DELETE_LEADS_QUEUE }}" \
-              -e TAG_LEADS_QUEUE="${{ secrets.TAG_LEADS_QUEUE }}" \
-              -e EXPORTS_EXCHANGE="${{ secrets.EXPORTS_EXCHANGE }}" \
-              -e AFRUS_DB_USER="${{ secrets.AFRUS_DB_USER }}" \
-              -e AFRUS_DB_HOST="${{ secrets.AFRUS_DB_HOST }}" \
-              -e AFRUS_DB_PORT="${{ secrets.AFRUS_DB_PORT }}" \
-              -e AFRUS_DB_NAME="${{ secrets.AFRUS_DB_NAME }}" \
-              -e AFRUS_DB_SSL_MODE="${{ secrets.AFRUS_DB_SSL_MODE }}" \
-              -e AFRUS_DB_PASSWORD="${{ secrets.AFRUS_DB_PASSWORD }}" \
-              -e VAULT_DB_USER="${{ secrets.VAULT_DB_USER }}" \
-              -e VAULT_DB_HOST="${{ secrets.VAULT_DB_HOST }}" \
-              -e VAULT_DB_PORT="${{ secrets.VAULT_DB_PORT }}" \
-              -e VAULT_DB_SSL_MODE="${{ secrets.VAULT_DB_SSL_MODE }}" \
-              -e VAULT_DB_PASSWORD="${{ secrets.VAULT_DB_PASSWORD }}" \
-              -e ANALYTICS_DB_NAME="${{ secrets.ANALYTICS_DB_NAME }}" \
-              -e AWS_S3_KEY="${{ secrets.AWS_S3_KEY }}" \
-              -e AWS_S3_SECRET="${{ secrets.AWS_S3_SECRET }}" \
-              -e AWS_S3_REGION="${{ secrets.AWS_S3_REGION }}" \
-              -e AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}" \
-              -e REDIS_HOST="${{ secrets.REDIS_HOST }}" \
-              -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
-              -e REDIS_PORT="${{ secrets.REDIS_PORT }}" \
-              afrus-exports
+            sudo docker run -d --name afrus-whatsapp-evolution_api-notification --network host \
+            -e ENVIRONMENT="${{ secrets.ENVIRONMENT }}" \
+            -e SERVER_PORT="${{ secrets.SERVER_PORT }}" \
+            -e RABBITMQ_URL="${{ secrets.RABBITMQ_URL }}" \
+            -e RABBITMQ_PORT="${{ secrets.RABBITMQ_PORT }}" \
+            -e RABBITMQ_USER="${{ secrets.RABBITMQ_USER}}" \
+            -e RABBITMQ_PASSWORD="${{ secrets.RABBITMQ_PASSWORD }}" \
+            -e RABBITMQ_MANAGER_PORT="${{ secrets.RABBITMQ_MANAGER_PORT }}" \
+            -e RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_EXCHANGE }}" \
+            -e RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_QUEUE }}" \
+            -e RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_BLAST_ROUTING_KEY }}" \
+            -e RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_QUEUE }}" \
+            -e RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY="${{ secrets.RABBITMQ_EVOLUTION_API_NOTIFICATION_AUTORESPONDER_ROUTING_KEY }}" \
+            -e RABBITMQ_BILLING_EXCHANGE="${{ secrets.RABBITMQ_BILLING_EXCHANGE }}" \
+            -e RABBITMQ_BILLING_QUEUE="${{ secrets.RABBITMQ_BILLING_QUEUE }}" \
+            -e RABBITMQ_BILLING_ROUTING_KEY="${{ secrets.RABBITMQ_BILLING_ROUTING_KEY }}" \
+            -e AFRUS_DB_USER="${{ secrets.AFRUS_DB_USER }}" \
+            -e AFRUS_DB_HOST="${{ secrets.AFRUS_DB_HOST }}" \
+            -e AFRUS_DB_PORT="${{ secrets.AFRUS_DB_PORT }}" \
+            -e AFRUS_DB_NAME="${{ secrets.AFRUS_DB_NAME }}" \
+            -e AFRUS_DB_SSL_MODE="${{ secrets.AFRUS_DB_SSL_MODE }}" \
+            -e AFRUS_DB_PASSWORD="${{ secrets.AFRUS_DB_PASSWORD }}" \
+            -e EVENTS_DB_USER="${{ secrets.EVENTS_DB_USER }}" \
+            -e EVENTS_DB_HOST="${{ secrets.EVENTS_DB_HOST }}" \
+            -e EVENTS_DB_PORT="${{ secrets.EVENTS_DB_PORT }}" \
+            -e EVENTS_DB_SSL_MODE="${{ secrets.EVENTS_DB_SSL_MODE }}" \
+            -e EVENTS_DB_PASSWORD="${{ secrets.EVENTS_DB_PASSWORD }}" \
+            -e EVENTS_DB_NAME="${{ secrets.EVENTS_DB_NAME }}" \
+            -e EVOLUTION_API_BASE_URL="${{ secrets.EVOLUTION_API_BASE_URL }}" \
+            -e EVOLUTION_API_KEY="${{ secrets.EVOLUTION_API_KEY }}" \
+            afrus-whatsapp-evolution_api-notification
 
       - name: Send Discord
         env:

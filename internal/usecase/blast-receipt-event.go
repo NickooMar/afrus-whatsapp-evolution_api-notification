@@ -81,6 +81,11 @@ func (rbu *ReceiptBlastEventUseCase) Execute(event string) error {
 		break
 	}
 
+	err = rbu.SendEventToBilling()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -150,6 +155,14 @@ func (rbu *ReceiptBlastEventUseCase) StoreEvent(kind string, data dto.BlastEvent
 
 	log.Printf("[EVENT] - Event of type: '%s' for communicationWhatsappId: '%d' saved successfully", kind, data.CommunicationWhatsappId)
 
+	return nil
+}
+
+func (rbu *ReceiptBlastEventUseCase) SendEventToBilling() error {
+	err := rbu.Queue.Publish(rbu.Ctx, rbu.Configs.RabbitMQBillingExchange, rbu.Configs.RabbitMQBillingRoutingKey, []byte("receipt"))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
