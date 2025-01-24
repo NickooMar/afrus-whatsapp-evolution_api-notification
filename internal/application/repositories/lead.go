@@ -12,7 +12,7 @@ type LeadRepository struct {
 }
 
 type LeadRepositoryInterface interface {
-	FindById(id int) (*models.Lead, error)
+	FindById(ctx context.Context, id int) (*models.Lead, error)
 }
 
 func NewLeadRepository(db *gorm.DB) *LeadRepository {

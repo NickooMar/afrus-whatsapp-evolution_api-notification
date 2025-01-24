@@ -15,6 +15,12 @@ const (
 	EventsDB = "eventosdb"
 )
 
+// DBConnections holds the connections to both PostgreSQL databases
+type DBConnections struct {
+	Afrus    *gorm.DB
+	EventsDB *gorm.DB
+}
+
 type DBConfig struct {
 	Host     string
 	User     string
