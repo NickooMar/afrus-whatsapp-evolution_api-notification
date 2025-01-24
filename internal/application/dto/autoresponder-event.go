@@ -1,6 +1,6 @@
 package dto
 
-type EventProcess struct {
+type AutoresponderEventProcess struct {
 	Content            string `json:"content"`
 	LeadID             int    `json:"lead_id"`
 	OrganizationID     int    `json:"organization_id"`

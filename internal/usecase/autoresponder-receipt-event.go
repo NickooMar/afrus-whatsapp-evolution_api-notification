@@ -3,9 +3,10 @@ package usecase
 import (
 	config "afrus-whatsapp-evolution_api-notification/configs"
 	"afrus-whatsapp-evolution_api-notification/internal/application/dto"
-	"afrus-whatsapp-evolution_api-notification/internal/application/protocols"
 	"afrus-whatsapp-evolution_api-notification/internal/application/repositories"
 	"afrus-whatsapp-evolution_api-notification/internal/domain/models"
+	"afrus-whatsapp-evolution_api-notification/internal/services"
+	"afrus-whatsapp-evolution_api-notification/pkg/queue"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -17,53 +18,31 @@ import (
 	"gorm.io/gorm"
 )
 
-type MediaMessage struct {
-	MediaType string `json:"mediatype"`
-	MimeType  string `json:"mimetype"`
-	Caption   string `json:"caption"`
-	Media     string `json:"media"`
-	FileName  string `json:"fileName"`
+type ReceiptAutoresponderEventUseCase struct {
+	Ctx                   context.Context
+	Configs               *config.Config
+	Queue                 *queue.RabbitMQ
+	AfrusDB               *gorm.DB
+	EventsDB              *gorm.DB
+	whatsappSenderService *services.WhatsappSenderService
 }
 
-type TextMessage struct {
-	Text string `json:"text"`
-}
-
-type Options struct {
-	Delay       int    `json:"delay"`
-	Presence    string `json:"presence"`
-	LinkPreview bool   `json:"linkPreview"`
-}
-
-type Payload struct {
-	Number       string        `json:"number"`
-	MediaMessage *MediaMessage `json:"mediaMessage"`
-	TextMessage  *TextMessage  `json:"textMessage"`
-	Options      Options       `json:"options"`
-}
-
-type ReceiptWhatsappEventUseCase struct {
-	Ctx      context.Context
-	Configs  *config.Config
-	Queue    protocols.Queue
-	AfrusDB  *gorm.DB
-	EventsDB *gorm.DB
-}
-
-func NewReceiptWhatsappEventUseCase(ctx context.Context, configs *config.Config, queue protocols.Queue, afrusDB, eventsDB *gorm.DB) *ReceiptWhatsappEventUseCase {
-	return &ReceiptWhatsappEventUseCase{
-		Ctx:      ctx,
-		Configs:  configs,
-		Queue:    queue,
-		AfrusDB:  afrusDB,
-		EventsDB: eventsDB,
+func NewReceiptAutoresponderEventUseCase(ctx context.Context, configs *config.Config, queue *queue.RabbitMQ, afrusDB, eventsDB *gorm.DB, whatsappSenderService *services.WhatsappSenderService) *ReceiptAutoresponderEventUseCase {
+	return &ReceiptAutoresponderEventUseCase{
+		Ctx:                   ctx,
+		Configs:               configs,
+		Queue:                 queue,
+		AfrusDB:               afrusDB,
+		EventsDB:              eventsDB,
+		whatsappSenderService: whatsappSenderService,
 	}
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
-	var data dto.EventProcess
+func (rwe *ReceiptAutoresponderEventUseCase) Execute(event string) error {
+	var data dto.AutoresponderEventProcess
 	if err := json.Unmarshal([]byte(event), &data); err != nil {
 		log.Printf("Error to decode JSON: %v", err)
+		return err
 	}
 
 	leadRepo := repositories.NewLeadRepository(rwe.AfrusDB)
@@ -103,15 +82,15 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		return fmt.Errorf("error updating whatsapp instance data: %v", err)
 	}
 
-	var resp *WhatsappResponse
+	var resp *services.WhatsappResponse
 
 	// TODO: Move this to a helper function
 	if len(attachments) == 0 {
-		resp, err = rwe.SendWhatsappTextMessage(lead, whatsappInstance, whatsappTrigger, data)
+		resp, err = rwe.whatsappSenderService.SendWhatsappTextMessage(lead, whatsappInstance, data.Content)
 		if err != nil {
 			fmt.Printf("Failed to send message in main instance %s - %v\n", whatsappInstance.InstanceName, err)
 			for _, instance := range whatsappInstances {
-				resp, err = rwe.SendWhatsappTextMessage(lead, &instance, whatsappTrigger, data)
+				resp, err = rwe.whatsappSenderService.SendWhatsappTextMessage(lead, &instance, data.Content)
 				if err != nil {
 					fmt.Printf("[Failed to send message in %s] - %v\n", instance.InstanceName, err)
 				} else {
@@ -134,7 +113,13 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 		}
 	} else {
 		for _, attachment := range attachments {
-			resp, err = rwe.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappTrigger, attachment, data)
+			whatsappAttachment := services.WhatsappAttachement{
+				Type:     attachment.Type,
+				Content:  attachment.Content,
+				Filename: attachment.Filename,
+				Size:     attachment.Size,
+			}
+			resp, err = rwe.whatsappSenderService.SendWhatsappMediaMessage(lead, whatsappInstance, whatsappAttachment, data.Content)
 			if err != nil {
 				fmt.Printf("[Failed to send media message to main instance %s] - %v\n", whatsappInstance.InstanceName, err)
 				if storeErr := rwe.StoreEvent("failed", data, lead, resp); storeErr != nil {
@@ -158,7 +143,7 @@ func (rwe *ReceiptWhatsappEventUseCase) Execute(event string) error {
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) processRules(data dto.EventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
+func (rwe *ReceiptAutoresponderEventUseCase) processRules(data dto.AutoresponderEventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	if err := rwe.maxConsecutivesSent(data, whatsappInstance, whatsappTrigger); err != nil {
 		return err
 	}
@@ -171,7 +156,7 @@ func (rwe *ReceiptWhatsappEventUseCase) processRules(data dto.EventProcess, what
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(data dto.EventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
+func (rwe *ReceiptAutoresponderEventUseCase) maxConsecutivesSent(data dto.AutoresponderEventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	const (
 		baseMaxSends  = 2
 		maxSendsLimit = 6
@@ -195,7 +180,8 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(data dto.EventProces
 		if rwe.Configs.Environment == "development" {
 			return nil
 		} else {
-			message := &dto.EventProcess{
+			message := &dto.AutoresponderEventProcess{
+				Content:            data.Content,
 				LeadID:             data.LeadID,
 				OrganizationID:     data.OrganizationID,
 				WhatsappInstanceID: int(whatsappInstance.ID),
@@ -209,7 +195,7 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(data dto.EventProces
 
 			rwe.Queue.Schedule(
 				rwe.Configs.EvolutionAPINotificationExchange,
-				rwe.Configs.EvolutionAPINotificationRoutingKey,
+				rwe.Configs.EvolutionAPINotificationAutoresponderRoutingKey,
 				messageBytes,
 				int(time.Minute)*5,
 			)
@@ -221,7 +207,7 @@ func (rwe *ReceiptWhatsappEventUseCase) maxConsecutivesSent(data dto.EventProces
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(data dto.EventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
+func (rwe *ReceiptAutoresponderEventUseCase) maxSentRate(data dto.AutoresponderEventProcess, whatsappInstance *models.WhatsappInstance, whatsappTrigger *models.WhatsappTrigger) error {
 	const cooldownMinutes = 5
 
 	lastSendStr, ok := whatsappInstance.Data["last_send_time"].(string)
@@ -240,7 +226,8 @@ func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(data dto.EventProcess, whats
 		if rwe.Configs.Environment == "development" {
 			return nil
 		} else {
-			message := &dto.EventProcess{
+			message := &dto.AutoresponderEventProcess{
+				Content:            data.Content,
 				LeadID:             data.LeadID,
 				OrganizationID:     data.OrganizationID,
 				WhatsappInstanceID: int(whatsappInstance.ID),
@@ -254,7 +241,7 @@ func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(data dto.EventProcess, whats
 
 			rwe.Queue.Schedule(
 				rwe.Configs.EvolutionAPINotificationExchange,
-				rwe.Configs.EvolutionAPINotificationRoutingKey,
+				rwe.Configs.EvolutionAPINotificationAutoresponderRoutingKey,
 				messageBytes,
 				cooldownMinutes,
 			)
@@ -267,13 +254,13 @@ func (rwe *ReceiptWhatsappEventUseCase) maxSentRate(data dto.EventProcess, whats
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) sleepTime() error {
+func (rwe *ReceiptAutoresponderEventUseCase) sleepTime() error {
 	randomDelay := time.Duration(rand.Intn(60)+1) * time.Second
 	time.Sleep(randomDelay)
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventProcess, lead *models.Lead, resp *WhatsappResponse) error {
+func (rwe *ReceiptAutoresponderEventUseCase) StoreEvent(kind string, data dto.AutoresponderEventProcess, lead *models.Lead, resp *services.WhatsappResponse) error {
 	eventRepo := repositories.NewWhatsappEventRepository(rwe.EventsDB)
 
 	var messageID = ""
@@ -303,12 +290,12 @@ func (rwe *ReceiptWhatsappEventUseCase) StoreEvent(kind string, data dto.EventPr
 	}
 
 	if err := eventRepo.Save(rwe.Ctx, kind, event); err != nil {
-		return fmt.Errorf("error saving event: %v", err)
+		return fmt.Errorf("[EVENT] - error saving event: %v", err)
 	}
 	return nil
 }
 
-func (rwe *ReceiptWhatsappEventUseCase) SendEventToBilling() error {
+func (rwe *ReceiptAutoresponderEventUseCase) SendEventToBilling() error {
 	err := rwe.Queue.Publish(rwe.Ctx, rwe.Configs.RabbitMQBillingExchange, rwe.Configs.RabbitMQBillingRoutingKey, []byte("receipt"))
 	if err != nil {
 		return err
