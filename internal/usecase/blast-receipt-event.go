@@ -60,14 +60,15 @@ func (rbu *ReceiptBlastEventUseCase) Execute(event string) error {
 	var resp *services.WhatsappResponse
 
 	for _, instance := range communicationWhatsapp.Instances {
-		// err := rbu.processRules(&instance.WhatsappInstance)
-		// if err != nil {
-		// 	log.Printf("Error processing rules: %v - Trying with the next instance", err)
-		// 	continue
-		// }
+		err := rbu.processRules(&instance.WhatsappInstance)
+		if err != nil {
+			log.Printf("Error processing rules: %v - Trying with the next instance", err)
+			continue
+		}
 
 		resp, err = rbu.sendMessage(data, &instance.WhatsappInstance, lead, communicationWhatsapp)
 		if err != nil {
+			rbu.StoreEvent("failed", data, lead, nil)
 			log.Printf("Error sending message: %v - Trying with the next instance", err)
 			continue
 		}
@@ -88,7 +89,6 @@ func (rbu *ReceiptBlastEventUseCase) sendMessage(data dto.BlastEventProcess, ins
 
 	resp, err := rbu.whatsappSenderService.SendWhatsappTextMessage(lead, instance, data.Content)
 	if err != nil {
-		rbu.StoreEvent("failed", data, lead, nil)
 		return nil, err
 	}
 
