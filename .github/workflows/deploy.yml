@@ -24,13 +24,13 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY_STAGING }}
           command_timeout: 30m
           script: |
-            cd ~/afrus-whatsapp-evolution_api-notification
+            cd ~/afrus-whatsapp-evolution-api
 
             # 2. Update project
             git pull origin staging
 
             # 3. Build Docker image
-            sudo docker build -t afrus-whatsapp-evolution_api-notification \
+            sudo docker build -t afrus-whatsapp-evolution-api \
               --build-arg ENVIRONMENT="${{ secrets.ENVIRONMENT_STAGING }}" \
               --build-arg SERVER_PORT="${{ secrets.SERVER_PORT_STAGING }}" \
               --build-arg RABBITMQ_URL="${{ secrets.RABBITMQ_URL_STAGING }}" \
@@ -63,7 +63,7 @@ jobs:
               -f ./Dockerfile.prod .
 
             # 4. Stop and remove existing container 
-            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-whatsapp-evolution_api-notification")
+            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-whatsapp-evolution-api")
             if [ -n "$CONTAINER_ID" ]; then
               sudo docker stop $CONTAINER_ID
               sudo docker rm $CONTAINER_ID
@@ -73,7 +73,7 @@ jobs:
             sudo systemctl restart nginx
 
             # 5. Run new container
-            sudo docker run -d --name afrus-whatsapp-evolution_api-notification --network host \
+            sudo docker run -d --name afrus-whatsapp-evolution-api --network host \
               -e ENVIRONMENT="${{ secrets.ENVIRONMENT_STAGING }}" \
               -e SERVER_PORT="${{ secrets.SERVER_PORT_STAGING }}" \
               -e RABBITMQ_URL="${{ secrets.RABBITMQ_URL_STAGING }}" \
@@ -103,7 +103,7 @@ jobs:
               -e EVENTS_DB_NAME="${{ secrets.EVENTS_DB_NAME_STAGING }}" \
               -e EVOLUTION_API_BASE_URL="${{ secrets.EVOLUTION_API_BASE_URL_STAGING }}" \
               -e EVOLUTION_API_KEY="${{ secrets.EVOLUTION_API_KEY_STAGING }}" \
-              afrus-whatsapp-evolution_api-notification
+              afrus-whatsapp-evolution-api
 
       - name: Send Discord
         env:
@@ -128,13 +128,13 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           command_timeout: 30m
           script: |
-            cd ~/afrus-whatsapp-evolution_api-notification
+            cd ~/afrus-whatsapp-evolution-api
 
             # 2. Update project
             git pull origin main
 
             # 3. Build Docker image
-            sudo docker build -t afrus-whatsapp-evolution_api-notification \
+            sudo docker build -t afrus-whatsapp-evolution-api \
               --build-arg ENVIRONMENT="${{ secrets.ENVIRONMENT }}" \
               --build-arg SERVER_PORT="${{ secrets.SERVER_PORT }}" \
               --build-arg RABBITMQ_URL="${{ secrets.RABBITMQ_URL }}" \
@@ -167,7 +167,7 @@ jobs:
               -f ./Dockerfile.prod .
 
             # 4. Stop and remove existing container 
-            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-whatsapp-evolution_api-notification")
+            CONTAINER_ID=$(sudo docker ps -aqf "name=afrus-whatsapp-evolution-api")
             if [ -n "$CONTAINER_ID" ]; then
               sudo docker stop $CONTAINER_ID
               sudo docker rm $CONTAINER_ID
@@ -177,7 +177,7 @@ jobs:
             sudo systemctl restart nginx
 
             # 5. Run new container
-            sudo docker run -d --name afrus-whatsapp-evolution_api-notification --network host \
+            sudo docker run -d --name afrus-whatsapp-evolution-api --network host \
             -e ENVIRONMENT="${{ secrets.ENVIRONMENT }}" \
             -e SERVER_PORT="${{ secrets.SERVER_PORT }}" \
             -e RABBITMQ_URL="${{ secrets.RABBITMQ_URL }}" \
@@ -207,7 +207,7 @@ jobs:
             -e EVENTS_DB_NAME="${{ secrets.EVENTS_DB_NAME }}" \
             -e EVOLUTION_API_BASE_URL="${{ secrets.EVOLUTION_API_BASE_URL }}" \
             -e EVOLUTION_API_KEY="${{ secrets.EVOLUTION_API_KEY }}" \
-            afrus-whatsapp-evolution_api-notification
+            afrus-whatsapp-evolution-api
 
       - name: Send Discord
         env:
