@@ -90,7 +90,7 @@ func (rbu *ReceiptBlastEventUseCase) Execute(event string) error {
 }
 
 func (rbu *ReceiptBlastEventUseCase) sendMessage(data dto.BlastEventProcess, instance *models.WhatsappInstance, lead *models.Lead, communication *models.CommunicationWhatsapp) (*services.WhatsappResponse, error) {
-	log.Printf("[BLAST] - Sending message to: %s %s \n", lead.Email, lead.Phone)
+	log.Printf("[BLAST] - Sending message to: %s %s - in instance: %s \n", lead.Email, lead.Phone, instance.InstanceName)
 
 	resp, err := rbu.whatsappSenderService.SendWhatsappTextMessage(lead, instance, data.Content)
 	if err != nil {
